@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Trash2, Volume2, Clipboard, ArrowRightLeft, Sparkles } from 'lucide-react';
+import { Trash2, Volume2, Square, Clipboard, ArrowRightLeft, Sparkles, SlidersHorizontal } from 'lucide-react';
 import { LanguageCode } from '../types';
 import { getLanguageName, getLanguageFlag } from '../utils/detector';
 
@@ -8,12 +8,14 @@ interface TranslationInputProps {
   onChange: (val: string) => void;
   onClear: () => void;
   onSpeak: () => void;
+  onStopSpeaking: () => void;
   isSpeaking: boolean;
   sourceLang: LanguageCode | 'auto';
   detectedLang?: LanguageCode | null;
   onApplyLanguageSuggestion?: (lang: LanguageCode) => void;
   onSelectSample: (text: string) => void;
   onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  onOpenAudioSettings?: () => void;
 }
 
 const SAMPLE_PHRASES = [
@@ -30,12 +32,14 @@ export const TranslationInput: React.FC<TranslationInputProps> = ({
   onChange,
   onClear,
   onSpeak,
+  onStopSpeaking,
   isSpeaking,
   sourceLang,
   detectedLang,
   onApplyLanguageSuggestion,
   onSelectSample,
   onKeyDown,
+  onOpenAudioSettings,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -85,12 +89,25 @@ export const TranslationInput: React.FC<TranslationInputProps> = ({
         </div>
 
         {/* Action icons */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
+          {/* Audio Settings Trigger */}
+          {onOpenAudioSettings && (
+            <button
+              type="button"
+              onClick={onOpenAudioSettings}
+              className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
+              title="Ovoz sozlamalari (tezlik va balandlik)"
+              aria-label="Ovoz sozlamalari"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+            </button>
+          )}
+
           {value && (
             <button
               type="button"
               onClick={onClear}
-              className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+              className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
               title="Tozalash (🗑)"
               aria-label="Matnni tozalash"
             >
@@ -101,29 +118,12 @@ export const TranslationInput: React.FC<TranslationInputProps> = ({
           <button
             type="button"
             onClick={handlePaste}
-            className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+            className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
             title="Clipboarddan joylash"
             aria-label="Matnni joylash"
           >
             <Clipboard className="w-4 h-4" />
           </button>
-
-          {value.trim() && (
-            <button
-              type="button"
-              onClick={onSpeak}
-              disabled={isSpeaking}
-              className={`p-1.5 rounded-lg transition-colors ${
-                isSpeaking
-                  ? 'text-zinc-900 dark:text-white bg-zinc-200 dark:bg-zinc-800 animate-pulse'
-                  : 'text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-              }`}
-              title="Matnni ovozli eshitish"
-              aria-label="Ovozli eshitish"
-            >
-              <Volume2 className="w-4 h-4" />
-            </button>
-          )}
         </div>
       </div>
 
@@ -160,24 +160,52 @@ export const TranslationInput: React.FC<TranslationInputProps> = ({
         />
       </div>
 
-      {/* Bottom bar: character counts & quick examples */}
-      <div className="px-4 py-2.5 border-t border-zinc-100 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-wrap items-center justify-between gap-2">
-        {/* Sample phrases */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-          <span className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500 whitespace-nowrap hidden sm:inline">
-            Namunalar:
-          </span>
-          {SAMPLE_PHRASES.map((sample, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => onSelectSample(sample.text)}
-              className="text-[11px] text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700/80 border border-zinc-200/80 dark:border-zinc-700/60 rounded-md px-2 py-0.5 whitespace-nowrap transition-colors cursor-pointer"
-            >
-              {sample.text}
-            </button>
-          ))}
-        </div>
+      {/* Bottom bar: TTS Button, sample phrases, character counts */}
+      <div className="px-4 py-2.5 border-t border-zinc-100 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-wrap items-center justify-between gap-2.5">
+        {/* Prominent Speech Button (Sections 1, 4, 10) */}
+        {value.trim() ? (
+          <button
+            type="button"
+            onClick={isSpeaking ? onStopSpeaking : onSpeak}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer shadow-2xs ${
+              isSpeaking
+                ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 ring-2 ring-zinc-400/50'
+                : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-200'
+            }`}
+            title={isSpeaking ? "Ovozni to‘xtatish" : "Matnni ovoz chiqarib o‘qish"}
+            aria-label={isSpeaking ? "Ovozni to‘xtatish" : "Matnni o‘qib berish"}
+          >
+            {isSpeaking ? (
+              <>
+                <Square className="w-3.5 h-3.5 fill-current" />
+                <span>To‘xtatish</span>
+                <span className="text-[10px] opacity-80 font-normal hidden sm:inline">(O‘qilmoqda...)</span>
+              </>
+            ) : (
+              <>
+                <Volume2 className="w-3.5 h-3.5" />
+                <span>O‘qib berish</span>
+              </>
+            )}
+          </button>
+        ) : (
+          /* Sample phrases when empty */
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+            <span className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500 whitespace-nowrap hidden sm:inline">
+              Namunalar:
+            </span>
+            {SAMPLE_PHRASES.map((sample, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => onSelectSample(sample.text)}
+                className="text-[11px] text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700/80 border border-zinc-200/80 dark:border-zinc-700/60 rounded-md px-2 py-0.5 whitespace-nowrap transition-colors cursor-pointer"
+              >
+                {sample.text}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Counter */}
         <div className="text-[11px] text-zinc-400 dark:text-zinc-500 font-mono tabular-nums shrink-0 ml-auto">

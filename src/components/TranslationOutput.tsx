@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Copy, Check, Volume2, Star, Loader2, ArrowLeftRight, BookOpen } from 'lucide-react';
+import { Copy, Check, Volume2, Square, Star, Loader2, ArrowLeftRight, BookOpen, SlidersHorizontal } from 'lucide-react';
 import { TranslationResult, LanguageCode } from '../types';
 import { getLanguageFlag, getLanguageName } from '../utils/detector';
 
@@ -7,20 +7,24 @@ interface TranslationOutputProps {
   result: TranslationResult | null;
   isLoading: boolean;
   onSpeak: (text: string, lang: LanguageCode) => void;
+  onStopSpeaking: () => void;
   isSpeaking: boolean;
   onToggleFavorite?: (result: TranslationResult) => void;
   isFavorite?: boolean;
   onReverseTranslate?: () => void;
+  onOpenAudioSettings?: () => void;
 }
 
 export const TranslationOutput: React.FC<TranslationOutputProps> = ({
   result,
   isLoading,
   onSpeak,
+  onStopSpeaking,
   isSpeaking,
   onToggleFavorite,
   isFavorite = false,
   onReverseTranslate,
+  onOpenAudioSettings,
 }) => {
   const [copied, setCopied] = useState(false);
 
@@ -61,6 +65,49 @@ export const TranslationOutput: React.FC<TranslationOutputProps> = ({
         {/* Action icons */}
         {result?.translation && !isLoading && (
           <div className="flex items-center gap-1.5">
+            {/* Audio Settings Trigger */}
+            {onOpenAudioSettings && (
+              <button
+                type="button"
+                onClick={onOpenAudioSettings}
+                className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
+                title="Ovoz sozlamalari (tezlik va balandlik)"
+                aria-label="Ovoz sozlamalari"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+              </button>
+            )}
+
+            {/* Prominent Audio Listen/Stop button (Sections 2, 4, 10) */}
+            <button
+              type="button"
+              onClick={
+                isSpeaking
+                  ? onStopSpeaking
+                  : () => onSpeak(result.translation, result.targetLanguage)
+              }
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer shadow-2xs ${
+                isSpeaking
+                  ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 ring-2 ring-zinc-400/50'
+                  : 'text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700'
+              }`}
+              title={isSpeaking ? "Ovozni to‘xtatish" : "Tarjimani ovoz chiqarib o‘qish"}
+              aria-label={isSpeaking ? "Ovozni to‘xtatish" : "Tarjimani o‘qib berish"}
+            >
+              {isSpeaking ? (
+                <>
+                  <Square className="w-3.5 h-3.5 fill-current" />
+                  <span>To‘xtatish</span>
+                  <span className="text-[10px] opacity-80 font-normal hidden sm:inline">(O‘qilmoqda...)</span>
+                </>
+              ) : (
+                <>
+                  <Volume2 className="w-3.5 h-3.5" />
+                  <span>O‘qib berish</span>
+                </>
+              )}
+            </button>
+
             {/* Copy button */}
             <button
               type="button"
@@ -84,22 +131,6 @@ export const TranslationOutput: React.FC<TranslationOutputProps> = ({
                   <span className="hidden sm:inline">Nusxalash</span>
                 </>
               )}
-            </button>
-
-            {/* Audio Listen button */}
-            <button
-              type="button"
-              onClick={() => onSpeak(result.translation, result.targetLanguage)}
-              disabled={isSpeaking}
-              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                isSpeaking
-                  ? 'text-zinc-900 dark:text-white bg-zinc-200 dark:bg-zinc-800 animate-pulse'
-                  : 'text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-              }`}
-              title="Tarjimani ovozli eshitish"
-              aria-label="Ovozli eshitish"
-            >
-              <Volume2 className="w-4 h-4" />
             </button>
 
             {/* Favorite button */}

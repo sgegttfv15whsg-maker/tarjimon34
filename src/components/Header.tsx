@@ -1,10 +1,11 @@
 import React from 'react';
-import { Sun, Moon, History } from 'lucide-react';
+import { Sun, Moon, History, Volume2 } from 'lucide-react';
 
 interface HeaderProps {
   isDarkMode: boolean;
   onToggleDarkMode: () => void;
   onOpenHistory: () => void;
+  onOpenAudioSettings?: () => void;
   historyCount: number;
 }
 
@@ -12,6 +13,7 @@ export const Header: React.FC<HeaderProps> = ({
   isDarkMode,
   onToggleDarkMode,
   onOpenHistory,
+  onOpenAudioSettings,
   historyCount,
 }) => {
   return (
@@ -47,8 +49,21 @@ export const Header: React.FC<HeaderProps> = ({
           </span>
         </div>
 
-        {/* Zone 3: Actions (History & Dark/Light mode) */}
+        {/* Zone 3: Actions (Audio Settings, History & Dark/Light mode) */}
         <div className="flex items-center gap-2">
+          {/* Audio Settings Button */}
+          {onOpenAudioSettings && (
+            <button
+              type="button"
+              onClick={onOpenAudioSettings}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 cursor-pointer"
+              title="Ovoz sozlamalari (tezlik va balandlik)"
+            >
+              <Volume2 className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
+              <span className="hidden sm:inline">Ovoz</span>
+            </button>
+          )}
+
           {/* History Button */}
           <button
             type="button"

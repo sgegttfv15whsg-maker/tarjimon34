@@ -9,6 +9,7 @@ import { LanguageSelector } from './components/LanguageSelector';
 import { TranslationInput } from './components/TranslationInput';
 import { TranslationOutput } from './components/TranslationOutput';
 import { HistoryDrawer } from './components/HistoryDrawer';
+import { AudioSettingsModal } from './components/AudioSettingsModal';
 import { Footer } from './components/Footer';
 import {
   LanguageCode,
@@ -16,8 +17,10 @@ import {
   TranslationTone,
   TranslationResult,
   HistoryItem,
+  SpeechSettings,
+  SpeechSpeed,
 } from './types';
-import { speakText, stopSpeaking } from './utils/speech';
+import { speakText, stopSpeaking, isSpeechSupported } from './utils/speech';
 import { detectLanguageFromText } from './utils/detector';
 import { ArrowRight, AlertCircle, RefreshCw } from 'lucide-react';
 
@@ -27,6 +30,8 @@ const STORAGE_KEYS = {
   TONE: 'lingua_tone',
   SOURCE_LANG: 'lingua_source_lang',
   TARGET_LANG: 'lingua_target_lang',
+  SPEECH_RATE: 'lingua_speech_rate',
+  SPEECH_VOLUME: 'lingua_speech_volume',
 };
 
 export default function App() {
@@ -71,8 +76,26 @@ export default function App() {
   const [translationResult, setTranslationResult] = useState<TranslationResult | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isSpeakingInput, setIsSpeakingInput] = useState<boolean>(false);
-  const [isSpeakingOutput, setIsSpeakingOutput] = useState<boolean>(false);
+
+  // Audio / Speech Synthesis States
+  const [speechSettings, setSpeechSettings] = useState<SpeechSettings>(() => {
+    const savedRate = localStorage.getItem(STORAGE_KEYS.SPEECH_RATE);
+    const savedVolume = localStorage.getItem(STORAGE_KEYS.SPEECH_VOLUME);
+    return {
+      rate: savedRate ? (parseFloat(savedRate) as SpeechSpeed) : 1.0,
+      volume: savedVolume ? parseFloat(savedVolume) : 1.0,
+    };
+  });
+  const [isAudioModalOpen, setIsAudioModalOpen] = useState<boolean>(false);
+  const [activeSpeaker, setActiveSpeaker] = useState<'none' | 'input' | 'output'>('none');
+  const [isTestingAudio, setIsTestingAudio] = useState<boolean>(false);
+
+  // Save speech settings to localStorage
+  const handleUpdateSpeechSettings = (newSettings: SpeechSettings) => {
+    setSpeechSettings(newSettings);
+    localStorage.setItem(STORAGE_KEYS.SPEECH_RATE, newSettings.rate.toString());
+    localStorage.setItem(STORAGE_KEYS.SPEECH_VOLUME, newSettings.volume.toString());
+  };
 
   // History Drawer State
   const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
@@ -103,11 +126,109 @@ export default function App() {
   // Detected language from current input text
   const detectedLang = detectLanguageFromText(inputText);
 
+  // Stop active speech whenever user changes input text (Section 12)
+  const handleInputChange = (val: string) => {
+    if (activeSpeaker !== 'none') {
+      stopSpeaking();
+      setActiveSpeaker('none');
+    }
+    setInputText(val);
+    if (errorMessage) setErrorMessage(null);
+  };
+
+  // Manual Stop speech (Section 4)
+  const handleStopSpeaking = () => {
+    stopSpeaking();
+    setActiveSpeaker('none');
+    setIsTestingAudio(false);
+  };
+
+  // Speak input text (Section 1, 3, 8, 9, 13)
+  const handleSpeakInput = async () => {
+    if (!inputText.trim()) return;
+
+    if (!isSpeechSupported()) {
+      setErrorMessage('Bu qurilmada ovozli o‘qish funksiyasi qo‘llab-quvvatlanmaydi.');
+      return;
+    }
+
+    // Stop any existing speech before starting (Section 13)
+    stopSpeaking();
+    setActiveSpeaker('input');
+
+    // Language resolution: if source is auto, use detected language
+    const langToSpeak: LanguageCode = sourceLang === 'auto'
+      ? (detectedLang || 'uz')
+      : sourceLang;
+
+    await speakText(inputText, langToSpeak, {
+      rate: speechSettings.rate,
+      volume: speechSettings.volume,
+      onStart: () => setActiveSpeaker('input'),
+      onEnd: () => setActiveSpeaker('none'),
+      onError: (err) => {
+        setActiveSpeaker('none');
+        setErrorMessage(err);
+      },
+    });
+  };
+
+  // Speak output translation text (Section 2, 3, 8, 9, 13)
+  const handleSpeakOutput = async (text: string, lang: LanguageCode) => {
+    if (!text.trim()) return;
+
+    if (!isSpeechSupported()) {
+      setErrorMessage('Bu qurilmada ovozli o‘qish funksiyasi qo‘llab-quvvatlanmaydi.');
+      return;
+    }
+
+    // Stop any existing speech before starting (Section 13)
+    stopSpeaking();
+    setActiveSpeaker('output');
+
+    await speakText(text, lang, {
+      rate: speechSettings.rate,
+      volume: speechSettings.volume,
+      onStart: () => setActiveSpeaker('output'),
+      onEnd: () => setActiveSpeaker('none'),
+      onError: (err) => {
+        setActiveSpeaker('none');
+        setErrorMessage(err);
+      },
+    });
+  };
+
+  // Test Speech inside Audio Settings Modal
+  const handleTestSpeech = async () => {
+    if (!isSpeechSupported()) {
+      alert('Bu qurilmada ovozli o‘qish funksiyasi qo‘llab-quvvatlanmaydi.');
+      return;
+    }
+
+    stopSpeaking();
+    setIsTestingAudio(true);
+
+    const testPhrases: Record<LanguageCode, string> = {
+      uz: 'Salom! Ovozli o‘qish funksiyasi muvaffaqiyatli ishlamoqda.',
+      ru: 'Здравствуйте! Функция озвучивания текста работает успешно.',
+      en: 'Hello! The text to speech feature is working properly.',
+    };
+
+    const currentLang = sourceLang === 'auto' ? (detectedLang || 'uz') : sourceLang;
+    const phrase = testPhrases[currentLang];
+
+    await speakText(phrase, currentLang, {
+      rate: speechSettings.rate,
+      volume: speechSettings.volume,
+      onStart: () => setIsTestingAudio(true),
+      onEnd: () => setIsTestingAudio(false),
+      onError: () => setIsTestingAudio(false),
+    });
+  };
+
   // Swap Languages Handler
   const handleSwapLanguages = () => {
-    stopSpeaking();
-    setIsSpeakingInput(false);
-    setIsSpeakingOutput(false);
+    handleStopSpeaking();
 
     const currentActualSource = sourceLang === 'auto' ? (detectedLang || 'uz') : sourceLang;
     const newSource = targetLang;
@@ -133,6 +254,7 @@ export default function App() {
 
   // Switch to specific pair shortcut
   const handleSelectPair = (s: LanguageCode, t: LanguageCode) => {
+    handleStopSpeaking();
     setSourceLang(s);
     setTargetLang(t);
     if (inputText.trim()) {
@@ -142,6 +264,7 @@ export default function App() {
 
   // Switch source language suggestion (e.g. user typed Uzbek while in English mode)
   const handleApplyLanguageSuggestion = (suggestedSource: LanguageCode) => {
+    handleStopSpeaking();
     const newTarget = targetLang === suggestedSource
       ? (suggestedSource === 'uz' ? 'en' : 'uz')
       : targetLang;
@@ -166,9 +289,9 @@ export default function App() {
       return;
     }
 
+    handleStopSpeaking();
     setErrorMessage(null);
     setIsLoading(true);
-    stopSpeaking();
 
     const activeSourceOption = overrideSource || sourceLang;
     let effectiveTarget = overrideTarget || targetLang;
@@ -257,29 +380,10 @@ export default function App() {
 
   // Clear Input & Output
   const handleClear = () => {
+    handleStopSpeaking();
     setInputText('');
     setTranslationResult(null);
     setErrorMessage(null);
-    stopSpeaking();
-    setIsSpeakingInput(false);
-    setIsSpeakingOutput(false);
-  };
-
-  // Speech for Input text
-  const handleSpeakInput = async () => {
-    if (!inputText.trim()) return;
-    const lang = sourceLang === 'auto' ? (detectedLang || 'uz') : sourceLang;
-    setIsSpeakingInput(true);
-    await speakText(inputText, lang);
-    setIsSpeakingInput(false);
-  };
-
-  // Speech for Output text
-  const handleSpeakOutput = async (text: string, lang: LanguageCode) => {
-    if (!text.trim()) return;
-    setIsSpeakingOutput(true);
-    await speakText(text, lang);
-    setIsSpeakingOutput(false);
   };
 
   // Toggle favorite on current result
@@ -322,6 +426,7 @@ export default function App() {
 
   // Load from History
   const handleSelectHistoryItem = (item: HistoryItem) => {
+    handleStopSpeaking();
     setInputText(item.originalText);
     setSourceLang(item.sourceLanguage);
     setTargetLang(item.targetLanguage);
@@ -331,6 +436,7 @@ export default function App() {
 
   // Sample prompt selection
   const handleSelectSample = (sampleText: string) => {
+    handleStopSpeaking();
     setInputText(sampleText);
     handleTranslate(sampleText);
   };
@@ -351,6 +457,7 @@ export default function App() {
         isDarkMode={isDarkMode}
         onToggleDarkMode={toggleDarkMode}
         onOpenHistory={() => setIsHistoryOpen(true)}
+        onOpenAudioSettings={() => setIsAudioModalOpen(true)}
         historyCount={historyItems.length}
       />
 
@@ -379,42 +486,43 @@ export default function App() {
               </div>
               <button
                 type="button"
-                onClick={() => handleTranslate()}
+                onClick={() => setErrorMessage(null)}
                 className="font-medium underline hover:text-red-900 dark:hover:text-red-200 ml-2 cursor-pointer"
               >
-                Qaytadan urinish
+                Yopish
               </button>
             </div>
           )}
 
           {/* Dual Translation Panels: Side-by-side on desktop, stacked on mobile */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Left Panel: Input */}
+            {/* Left Panel: Input with Speech */}
             <TranslationInput
               value={inputText}
-              onChange={(val) => {
-                setInputText(val);
-                if (errorMessage) setErrorMessage(null);
-              }}
+              onChange={handleInputChange}
               onClear={handleClear}
               onSpeak={handleSpeakInput}
-              isSpeaking={isSpeakingInput}
+              onStopSpeaking={handleStopSpeaking}
+              isSpeaking={activeSpeaker === 'input'}
               sourceLang={sourceLang}
               detectedLang={detectedLang}
               onApplyLanguageSuggestion={handleApplyLanguageSuggestion}
               onSelectSample={handleSelectSample}
               onKeyDown={handleKeyDown}
+              onOpenAudioSettings={() => setIsAudioModalOpen(true)}
             />
 
-            {/* Right Panel: Output */}
+            {/* Right Panel: Output with Speech */}
             <TranslationOutput
               result={translationResult}
               isLoading={isLoading}
               onSpeak={handleSpeakOutput}
-              isSpeaking={isSpeakingOutput}
+              onStopSpeaking={handleStopSpeaking}
+              isSpeaking={activeSpeaker === 'output'}
               onToggleFavorite={handleToggleFavoriteResult}
               isFavorite={isCurrentFavorite}
               onReverseTranslate={handleReverseTranslate}
+              onOpenAudioSettings={() => setIsAudioModalOpen(true)}
             />
           </div>
 
@@ -469,6 +577,16 @@ export default function App() {
         onClearAll={() => {
           setHistoryItems([]);
         }}
+      />
+
+      {/* Audio Settings Modal */}
+      <AudioSettingsModal
+        isOpen={isAudioModalOpen}
+        onClose={() => setIsAudioModalOpen(false)}
+        settings={speechSettings}
+        onUpdateSettings={handleUpdateSpeechSettings}
+        onTestSpeech={handleTestSpeech}
+        isTesting={isTestingAudio}
       />
 
       {/* Footer */}
