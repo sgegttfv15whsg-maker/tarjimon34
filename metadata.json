@@ -1,0 +1,6 @@
+{
+  "name": "Lingua Translate - Russian ↔ English Translator",
+  "description": "Zamonaviy, tezkor va aniq o‘zbekcha, ruscha va inglizcha AI tarjimon ilovasi. Avtomatik til aniqlash, lug‘at va ovozli eshitish imkoniyatlari.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
